@@ -124,7 +124,7 @@ int main() {
                     // 获取cte，更好的做法是点到线的垂直距离
                     double cte = polyeval(fit_curve, 0);
 
-                    // get orientation error from fit,-atan(c1 + c2*x + c3* x^2), but the car is always at x=0.
+                    //  orientation error ,-atan(c1 + c2*x + c3* x^2), but the car is always at x=0.
                     double epsi = atan(fit_curve[1]);
 
                     Eigen::VectorXd state(6);

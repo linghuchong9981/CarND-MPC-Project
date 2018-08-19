@@ -6,7 +6,7 @@
 using CppAD::AD;
 
 
-size_t N = 16;
+size_t N = 18;
 double dt = 0.05;
 
 // This value assumes the model presented in the classroom is used.
@@ -20,7 +20,7 @@ double dt = 0.05;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
-const double ref_v = 50;
+const double ref_v = 60;
 
 size_t x_start = 0;
 size_t y_start = x_start + N;
@@ -152,8 +152,6 @@ void MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     }
 
     size_t latency_steps = 0.1 / dt;
-//  cout << "latency steps is " << latency_steps << endl;
-
     for (int i = delta_start; i < a_start; ++i) {
         if (i < delta_start + latency_steps) {
             vars_lowerbound[i] = last_delta;

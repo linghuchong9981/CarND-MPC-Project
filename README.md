@@ -2,6 +2,120 @@
 Self-Driving Car Engineer Nanodegree Program
 
 ---
+### The Model
+I choosed Kinematic bicycle model in this project. Kinematic models are simplifications of dynamic models that ignore tire forces, gravity, and mass.This simplification reduces the accuracy of the models, but it also makes them more tractable.  
+With Kinematic model,we have 4 vehicle state (x, y, psi, v), 2 actuators (delta, a) and 2 error elements (cte, epsi).
+Update equations as follows:
+
+<b> x<sub>t+1</sub> =  x<sub>t</sub> + v<sub>t</sub> \* cos(psi) \* dt  
+y<sub>t+1</sub> =  y<sub>t</sub> + v<sub>t</sub> \* sin(psi) \* dt   
+psi<sub>t+1</sub> =  psi<sub>t</sub> + v<sub>t</sub> / L<sub>f</sub>  \* delta \* dt  
+v<sub>t+1</sub> =  v<sub>t</sub> + a<sub>t</sub>  \* dt  
+cte<sub>t+1</sub> =  cte<sub>t</sub> + v<sub>t</sub> \* sin(psi) \* dt  
+epsi<sub>t+1</sub> =  epsi<sub>t</sub> + v<sub>t</sub> / L<sub>f</sub>  \* delta \* dt
+</b>
+
+### Timestep Length and Elapsed Duration (N & dt)
+The prediction horizon T is the product of two other variables, N and dt.
+- T should be a few seconds at most. Beyond that horizon, the environment will change enough that it won't make sense to predict any further into the future.
+
+- N determines the number of variables optimized by the MPC,this is also the major driver of computational cost.
+
+- MPC attempts to approximate a continuous reference trajectory by means of discrete paths between actuations. Larger values of dt result in less frequent actuations, which makes it harder to accurately approximate a continuous reference trajectory
+
+I choosed this value finally:
+```
+size_t N = 18;
+double dt = 0.05;
+```
+
+
+### Polynomial Fitting and MPC Preprocessing
+- Transforming map coordinate to vehicle coordinate is the most important thing.
+
+![tansform coordinate](./transforming.png)
+
+```
+Eigen::MatrixXd transformCoordinatesToVehicle(double x, double y, double psi, const vector<double> &ptsx,const vector<double> &ptsy) {
+
+    assert(ptsx.size() == ptsy.size());
+    unsigned len = ptsx.size();
+
+    auto waypoints = Eigen::MatrixXd(2, len);
+
+    for (auto i = 0; i < len; ++i) {
+        waypoints(0, i) = cos(psi) * (ptsx[i] - x) + sin(psi) * (ptsy[i] - y);
+        waypoints(1, i) = -sin(psi) * (ptsx[i] - x) + cos(psi) * (ptsy[i] - y);
+    }
+
+    return waypoints;
+}
+```
+
+- Then I fited the Polynomial with the transformed ptsx and ptsy.
+
+- Calculate cte and epsi with polynomial coeffs(fit_curve)
+
+```
+double cte = polyeval(fit_curve, 0);
+double epsi = atan(fit_curve[1]);
+```
+
+- the vehicle state in the vehicle cordinate system changed to
+
+```
+Eigen::VectorXd state(6);
+state << 0, 0, 0, v, cte, epsi;
+```
+
+### Model Predictive Control with Latency
+
+In order to deal with the latency, three things have done.
+- Save last step actuators values
+
+```
+mpc.last_delta = steer_value;
+mpc.last_a = throttle_value;
+```
+
+- Modify lowerbound and upperbound for actuators within latency
+
+```
+size_t latency_steps = 0.1 / dt;
+for (int i = delta_start; i < a_start; ++i) {
+    if (i < delta_start + latency_steps) {
+        vars_lowerbound[i] = last_delta;
+        vars_upperbound[i] = last_delta;
+        continue;
+    }
+    vars_lowerbound[i] = -0.436332;
+    vars_upperbound[i] = 0.436332;
+}
+
+for (int i = a_start; i < n_vars; i++) {
+    if (i < a_start + latency_steps) {
+        vars_lowerbound[i] = last_a;
+        vars_upperbound[i] = last_a;
+        continue;
+    }
+    vars_lowerbound[i] = -1.0;
+    vars_upperbound[i] = 1.0;
+}
+```
+
+- Return latency_steps  actuators (delta, a) to server instend of the first;
+
+```
+predict_delta = solution.x[delta_start + latency_steps];
+predict_a = solution.x[a_start + latency_steps];
+```
+
+
+
+
+
+
+---
 
 ## Dependencies
 
